@@ -46,7 +46,15 @@ enum
     N_PROPERTIES
 };
 
+enum
+{
+    POINT_CHANGED,
+    LAST_SIGNAL
+};
+
 static GParamSpec *egg_piecewise_linear_view_properties[N_PROPERTIES] = { NULL, };
+
+static guint egg_piecewise_linear_view_signals[LAST_SIGNAL] = { 0 };
 
 GtkWidget *
 egg_piecewise_linear_view_new (guint n_points, gint min, gint max)
@@ -90,20 +98,27 @@ egg_piecewise_linear_view_set_range (EggPiecewiseLinearView *view, gint min, gin
 void
 egg_piecewise_linear_view_set_point (EggPiecewiseLinearView *view, guint index, gint value)
 {
+    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
+
     EggPiecewiseLinearViewPrivate
                     *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
 
-    if (index >= priv->n_points) {
-        g_warning ("Point index out of range");
-        return;
-    }
-
-    if (value >= priv->max) {
-        g_warning ("Point value out of range");
-        return;
-    }
+    g_return_if_fail (index < priv->n_points);
+    g_return_if_fail (value < priv->max);
 
     priv->points[index] = value;
+}
+
+void egg_piecewise_linear_view_get_point (EggPiecewiseLinearView *view, guint index, gint *x, gint *y)
+{
+    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
+
+    EggPiecewiseLinearViewPrivate
+                    *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
+
+    g_return_if_fail (index < priv->n_points);
+    *y = priv->points[index];
+    *x = 0;
 }
 
 static void
@@ -224,12 +239,16 @@ egg_piecewise_linear_button_release (GtkWidget *widget, GdkEventButton *event)
 {
     EggPiecewiseLinearView
                     *view = EGG_PIECEWISE_LINEAR_VIEW (widget);
+    EggPiecewiseLinearViewPrivate
+                    *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
 
     if (event->button != 1)
         return TRUE;
 
-    view->priv->grabbed = FALSE;
+    priv->grabbed = FALSE;
     set_cursor_type (view, GDK_TCROSS);
+
+    g_signal_emit (view, egg_piecewise_linear_view_signals[POINT_CHANGED], 0, priv->dragged, priv->points[priv->dragged]);
 
     return TRUE;
 }
@@ -401,6 +420,16 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
     g_object_class_install_properties (gobject_class, 
                                        N_PROPERTIES,
                                        egg_piecewise_linear_view_properties);
+
+    egg_piecewise_linear_view_signals[POINT_CHANGED] =
+        g_signal_new ("point-changed",
+                      G_TYPE_FROM_CLASS (klass),
+                      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+                      0,
+                      NULL, NULL,
+                      g_cclosure_marshal_VOID__UINT,
+                      G_TYPE_NONE,
+                      1, G_TYPE_UINT);
 
     g_type_class_add_private (klass, sizeof (EggPiecewiseLinearViewPrivate));
 }

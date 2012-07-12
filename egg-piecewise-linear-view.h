@@ -44,6 +44,9 @@ struct _EggPiecewiseLinearView
 struct _EggPiecewiseLinearViewClass
 {
     GtkDrawingAreaClass     parent_class;
+
+    /* signals */
+    void (* point_changed)  (EggPiecewiseLinearView *view, guint index, gint value);
 };
 
 GType       egg_piecewise_linear_view_get_type              (void);
@@ -58,6 +61,10 @@ void        egg_piecewise_linear_view_set_point             (EggPiecewiseLinearV
 void        egg_piecewise_linear_view_set_range             (EggPiecewiseLinearView *view, 
                                                              gint                    min, 
                                                              gint                    max);
+void        egg_piecewise_linear_view_get_point             (EggPiecewiseLinearView *view,
+                                                             guint                   index,
+                                                             gint                   *x,
+                                                             gint                   *y);
 
 G_END_DECLS
 

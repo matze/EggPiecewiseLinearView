@@ -24,6 +24,15 @@ on_delete_event (GtkWidget *widget, GdkEvent *event, gpointer user_data)
     return FALSE;
 }
 
+static void
+on_point_changed (EggPiecewiseLinearView *view, guint index, gpointer user_data)
+{
+    gint x, y;
+
+    egg_piecewise_linear_view_get_point (view, index, &x, &y);
+    g_print ("data point %i changed to %i\n", index, y);
+}
+
 int
 main (int argc, char* argv[])
 {
@@ -43,6 +52,8 @@ main (int argc, char* argv[])
     egg_piecewise_linear_view_set_point (pwl, 0, 0);
     egg_piecewise_linear_view_set_point (pwl, 1, 100);
     egg_piecewise_linear_view_set_point (pwl, 2, 200);
+
+    g_signal_connect (view, "point-changed", G_CALLBACK (on_point_changed), NULL);
 
     gtk_container_add (GTK_CONTAINER (window), view);
     gtk_widget_show_all (window);
