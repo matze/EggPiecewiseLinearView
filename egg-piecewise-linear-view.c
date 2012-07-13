@@ -108,6 +108,7 @@ egg_piecewise_linear_view_set_point (EggPiecewiseLinearView *view, guint index, 
     g_return_if_fail (value < priv->max);
 
     priv->points[index] = value;
+    gtk_widget_queue_draw (GTK_WIDGET (view));
 }
 
 void egg_piecewise_linear_view_get_point (EggPiecewiseLinearView *view, guint index, gint *x, gint *y)
