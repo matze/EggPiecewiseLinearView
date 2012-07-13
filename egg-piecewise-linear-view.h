@@ -55,11 +55,11 @@ GtkWidget * egg_piecewise_linear_view_new                   (guint              
                                                              gint                    max);
 void        egg_piecewise_linear_view_set_number_of_points  (EggPiecewiseLinearView *view,
                                                              guint                   n_points);
-void        egg_piecewise_linear_view_set_point             (EggPiecewiseLinearView *view, 
-                                                             guint                   index, 
+void        egg_piecewise_linear_view_set_point             (EggPiecewiseLinearView *view,
+                                                             guint                   index,
                                                              gint                    value);
-void        egg_piecewise_linear_view_set_range             (EggPiecewiseLinearView *view, 
-                                                             gint                    min, 
+void        egg_piecewise_linear_view_set_range             (EggPiecewiseLinearView *view,
+                                                             gint                    min,
                                                              gint                    max);
 void        egg_piecewise_linear_view_get_point             (EggPiecewiseLinearView *view,
                                                              guint                   index,

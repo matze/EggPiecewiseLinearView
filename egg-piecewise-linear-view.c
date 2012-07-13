@@ -61,8 +61,8 @@ egg_piecewise_linear_view_new (guint n_points, gint min, gint max)
 {
     GObject *view;
 
-    view = g_object_new (EGG_TYPE_PIECEWISE_LINEAR_VIEW, 
-                         "num-points", n_points, 
+    view = g_object_new (EGG_TYPE_PIECEWISE_LINEAR_VIEW,
+                         "num-points", n_points,
                          "min", min,
                          "max", max,
                          NULL);
@@ -332,12 +332,12 @@ egg_piecewise_linear_view_set_property (GObject        *object,
 
         case PROP_MIN:
             {
-                gint min = g_value_get_int (value); 
-                
+                gint min = g_value_get_int (value);
+
                 if (min > priv->max)
                     g_warning ("%i < %i is not possible", min, priv->max);
                 else {
-                    priv->min = min; 
+                    priv->min = min;
                     clamp_points (priv);
                 }
             }
@@ -345,12 +345,12 @@ egg_piecewise_linear_view_set_property (GObject        *object,
 
         case PROP_MAX:
             {
-                gint max = g_value_get_int (value); 
-                
+                gint max = g_value_get_int (value);
+
                 if (max < priv->min)
                     g_warning ("%i < %i is not possible", priv->min, max);
                 else {
-                    priv->max = max; 
+                    priv->max = max;
                     clamp_points (priv);
                 }
             }
@@ -404,28 +404,28 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
     widget_class->button_release_event = egg_piecewise_linear_button_release;
     widget_class->motion_notify_event = egg_piecewise_linear_motion_notify;
 
-    egg_piecewise_linear_view_properties[PROP_NUM_POINTS] = 
+    egg_piecewise_linear_view_properties[PROP_NUM_POINTS] =
         g_param_spec_uint("num-points",
                           "Number of data points",
                           "Number of data points",
                           1, G_MAXUINT, 2,
                           G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
 
-    egg_piecewise_linear_view_properties[PROP_MIN] = 
+    egg_piecewise_linear_view_properties[PROP_MIN] =
         g_param_spec_int("min",
                           "Minimum of the range",
                           "Minimum of the range",
                           -G_MAXINT, G_MAXINT, 0,
                           G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
 
-    egg_piecewise_linear_view_properties[PROP_MAX] = 
+    egg_piecewise_linear_view_properties[PROP_MAX] =
         g_param_spec_int("max",
                           "Maximum of the range",
                           "Maximum of the range",
                           -G_MAXINT, G_MAXINT, 1,
                           G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
 
-    g_object_class_install_properties (gobject_class, 
+    g_object_class_install_properties (gobject_class,
                                        N_PROPERTIES,
                                        egg_piecewise_linear_view_properties);
 
