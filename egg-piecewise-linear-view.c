@@ -319,6 +319,12 @@ egg_piecewise_linear_view_set_property (GObject        *object,
                 }
 
                 priv->points = g_realloc_n (priv->points, n_points, sizeof (gint));
+
+                if (n_points > priv->n_points) {
+                    for (guint i = priv->n_points - 1; i < n_points; i++)
+                        priv->points[i] = 0;
+                }
+
                 priv->n_points = n_points;
             }
             break;
