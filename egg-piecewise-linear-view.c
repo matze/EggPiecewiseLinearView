@@ -75,6 +75,7 @@ egg_piecewise_linear_view_set_number_of_points (EggPiecewiseLinearView *view, gu
 {
     g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
     g_object_set (G_OBJECT (view), "num-points", n_points, NULL);
+    gtk_widget_queue_draw (GTK_WIDGET (view));
 }
 
 static void
@@ -312,7 +313,7 @@ egg_piecewise_linear_view_set_property (GObject        *object,
             {
                 guint n_points = g_value_get_uint (value);
 
-                if (n_points < 2) {
+                if (n_points < 1) {
                     g_warning ("Not enough points");
                     return;
                 }
@@ -400,7 +401,7 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
         g_param_spec_uint("num-points",
                           "Number of data points",
                           "Number of data points",
-                          2, G_MAXUINT, 2,
+                          1, G_MAXUINT, 2,
                           G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
 
     egg_piecewise_linear_view_properties[PROP_MIN] = 
