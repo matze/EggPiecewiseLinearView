@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "egg-piecewise-linear-view.h"
+#include "egg-data-points.h"
 
 G_DEFINE_TYPE (EggPiecewiseLinearView, egg_piecewise_linear_view, GTK_TYPE_DRAWING_AREA)
 
@@ -29,20 +30,25 @@ G_DEFINE_TYPE (EggPiecewiseLinearView, egg_piecewise_linear_view, GTK_TYPE_DRAWI
 struct _EggPiecewiseLinearViewPrivate
 {
     gint            border_width;
-    guint           n_points;
-    guint          *points;
-    guint           dragged;
-    gint            min, max;
-    gboolean        grabbed;
+    EggDataPoints  *points;
     GdkCursorType   cursor_type;
+
+    gboolean        grabbed;
+    guint           dragged_index;
+    GtkAdjustment  *dragged_x;
+    GtkAdjustment  *dragged_y;
+
+    gboolean        fixed_x;
+    gboolean        fixed_y;
+    gboolean        fixed_borders;
 };
 
 enum
 {
     PROP_0,
-    PROP_NUM_POINTS,
-    PROP_MIN,
-    PROP_MAX,
+    PROP_FIXED_X,
+    PROP_FIXED_Y,
+    PROP_FIXED_BORDERS,
     N_PROPERTIES
 };
 
@@ -57,70 +63,26 @@ static GParamSpec *egg_piecewise_linear_view_properties[N_PROPERTIES] = { NULL, 
 static guint egg_piecewise_linear_view_signals[LAST_SIGNAL] = { 0 };
 
 GtkWidget *
-egg_piecewise_linear_view_new (guint n_points, gint min, gint max)
+egg_piecewise_linear_view_new (void)
 {
-    GObject *view;
-
-    view = g_object_new (EGG_TYPE_PIECEWISE_LINEAR_VIEW,
-                         "num-points", n_points,
-                         "min", min,
-                         "max", max,
-                         NULL);
-
-    return GTK_WIDGET (view);
+    return GTK_WIDGET (g_object_new (EGG_TYPE_PIECEWISE_LINEAR_VIEW, NULL));
 }
 
 void
-egg_piecewise_linear_view_set_number_of_points (EggPiecewiseLinearView *view, guint n_points)
-{
-    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
-    g_object_set (G_OBJECT (view), "num-points", n_points, NULL);
-    gtk_widget_queue_draw (GTK_WIDGET (view));
-}
-
-static void
-clamp_points (EggPiecewiseLinearViewPrivate *priv)
-{
-    for (guint i = 0; i < priv->n_points; i++)
-        priv->points[i] = CLAMP (priv->points[i], priv->min, priv->max);
-}
-
-void
-egg_piecewise_linear_view_set_range (EggPiecewiseLinearView *view, gint min, gint max)
+egg_piecewise_linear_view_set_points (EggPiecewiseLinearView *view, EggDataPoints *points)
 {
     g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
 
-    g_object_set (G_OBJECT (view),
-            "min", min,
-            "max", max,
-            NULL);
+    g_object_ref (points);
+    view->priv->points = points;
 }
 
-void
-egg_piecewise_linear_view_set_point (EggPiecewiseLinearView *view, guint index, gint value)
+EggDataPoints *
+egg_piecewise_linear_view_get_points (EggPiecewiseLinearView *view)
 {
-    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
+    g_return_val_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view), NULL);
 
-    EggPiecewiseLinearViewPrivate
-                    *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
-
-    g_return_if_fail (index < priv->n_points);
-    g_return_if_fail (value < priv->max);
-
-    priv->points[index] = value;
-    gtk_widget_queue_draw (GTK_WIDGET (view));
-}
-
-void egg_piecewise_linear_view_get_point (EggPiecewiseLinearView *view, guint index, gint *x, gint *y)
-{
-    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
-
-    EggPiecewiseLinearViewPrivate
-                    *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
-
-    g_return_if_fail (index < priv->n_points);
-    *y = priv->points[index];
-    *x = 0;
+    return view->priv->points;
 }
 
 static void
@@ -131,10 +93,24 @@ egg_piecewise_linear_view_size_request (GtkWidget *widget, GtkRequisition *requi
     requisition->height = MIN_HEIGHT;
 }
 
-static gdouble
-map_point (guint y, guint max, guint height)
+/* static gdouble */
+/* map_point (guint y, gdouble upper_x, guint height) */
+/* { */
+/*     return height - height * y / upper_x; */
+/* } */
+
+static void
+map_x_to_window (gdouble *x, gdouble xscale, gdouble width)
 {
-    return height - height * y / ((gdouble) max);
+    *x /= xscale;
+    *x *= width;
+}
+
+static void
+map_y_to_window (gdouble *y, gdouble yscale, gdouble height)
+{
+    *y /= yscale;
+    *y = height - (*y) * height;
 }
 
 static gboolean
@@ -147,7 +123,11 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
     cairo_t         *cr;
     gint             border;
     gint             width, height;
-    gdouble          xshift;
+    gdouble          x, y;
+    gdouble          lower_x, upper_x;
+    gdouble          lower_y, upper_y;
+    gdouble          xscale, yscale;
+    guint            n_points;
 
     cr = gdk_cairo_create (gtk_widget_get_window (widget));
     gdk_cairo_region (cr, event->region);
@@ -169,21 +149,43 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
     cairo_rectangle (cr, border, border, width - 1, height - 1);
     cairo_stroke (cr);
 
-    /* Draw lines */
-    xshift = width / ((gdouble) priv->n_points - 1);
-    cairo_set_line_width (cr, 1.5);
-    cairo_move_to (cr, border, map_point (priv->points[0], priv->max, height));
+    /* Scale to the data point coordinate system */
+    egg_data_points_get_x_range (priv->points, &lower_x, &upper_x);
+    egg_data_points_get_y_range (priv->points, &lower_y, &upper_y);
 
-    for (guint i = 1; i < priv->n_points; i++)
-        cairo_line_to (cr, border + i*xshift, map_point (priv->points[i], priv->max, height));
+    xscale = upper_x - lower_x;
+    yscale = upper_y - lower_y;
+
+    /* Draw lines */
+    n_points = egg_data_points_get_num (priv->points);
+    x = egg_data_points_get_x_value (priv->points, 0);
+    y = egg_data_points_get_y_value (priv->points, 0);
+
+    cairo_set_line_width (cr, 1.5);
+    map_x_to_window (&x, xscale, width);
+    map_y_to_window (&y, yscale, height);
+    cairo_move_to (cr, x, y);
+
+    for (guint i = 1; i < n_points; i++) {
+        x = egg_data_points_get_x_value (priv->points, i);
+        y = egg_data_points_get_y_value (priv->points, i);
+        map_x_to_window (&x, xscale, width);
+        map_y_to_window (&y, yscale, height);
+        cairo_line_to (cr, x, y);
+    }
 
     cairo_stroke (cr);
 
+#define RADIUS 3
+
     /* Draw points */
-    for (guint i = 0; i < priv->n_points; i++) {
-        gdouble y = map_point (priv->points[i], priv->max, height);
-        cairo_move_to (cr, border + i*xshift + 3, y);
-        cairo_arc (cr, border + i*xshift, y, 3, 0, 2 * G_PI);
+    for (guint i = 0; i < n_points; i++) {
+        x = egg_data_points_get_x_value (priv->points, i);
+        y = egg_data_points_get_y_value (priv->points, i);
+        map_x_to_window (&x, xscale, width);
+        map_y_to_window (&y, yscale, height);
+        cairo_move_to (cr, x + RADIUS, y);
+        cairo_arc (cr, x, y, RADIUS, 0, 2 * G_PI);
         cairo_stroke (cr);
     }
 
@@ -203,8 +205,8 @@ set_cursor_type (EggPiecewiseLinearView *view, GdkCursorType cursor_type)
     }
 }
 
-static gboolean
-egg_piecewise_linear_button_press (GtkWidget *widget, GdkEventButton *event)
+static void
+get_closest_point (GtkWidget *widget, gint in_x, gint in_y, gdouble *out_x, gdouble *out_y, guint *index, gdouble *out_distance)
 {
     EggPiecewiseLinearView
                     *view = EGG_PIECEWISE_LINEAR_VIEW (widget);
@@ -212,26 +214,61 @@ egg_piecewise_linear_button_press (GtkWidget *widget, GdkEventButton *event)
                     *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
     GtkAllocation    allocation;
     gint             border;
-    gint             width;
-    gdouble          x, rx;
+    gint             width, height;
+    gdouble          lower_x, upper_x;
+    gdouble          lower_y, upper_y;
+    gdouble          x, y;
+    gdouble          distance;
+    guint            closest;
+
+    gtk_widget_get_allocation (widget, &allocation);
+    border = priv->border_width;
+    width  = allocation.width - 2 * border;
+    height = allocation.height - 2 * border;
+    x = (gdouble) (in_x - border) / (gdouble) width;
+    y = (gdouble) (height - in_y - border) / (gdouble) height;
+
+    egg_data_points_get_x_range (priv->points, &lower_x, &upper_x);
+    egg_data_points_get_y_range (priv->points, &lower_y, &upper_y);
+
+    x *= upper_x;
+    y *= upper_y;
+
+    closest = egg_data_get_closest_point (priv->points, x, y, &distance);
+    *out_x = x;
+    *out_y = y;
+    *index = closest;
+    *out_distance = distance;
+}
+
+static gboolean
+egg_piecewise_linear_button_press (GtkWidget *widget, GdkEventButton *event)
+{
+    EggPiecewiseLinearView
+                    *view = EGG_PIECEWISE_LINEAR_VIEW (widget);
+    EggPiecewiseLinearViewPrivate
+                    *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
+    gdouble          x, y;
+    gdouble          distance;
+    guint            closest;
+    guint            n_points;
 
     if (event->button != 1)
         return TRUE;
 
-    gtk_widget_get_allocation (widget, &allocation);
+    get_closest_point (widget, event->x, event->y, &x, &y, &closest, &distance);
+    n_points = egg_data_points_get_num (priv->points);
 
-    border  = priv->border_width;
-    width   = allocation.width - 2 * border;
-    x       = (gdouble) (event->x - border) / (gdouble) width;
-    rx      = floor(x * (priv->n_points - 1) + 0.5);
+    if (!priv->fixed_borders || (closest > 0 && (closest < n_points - 1))) {
+        if (distance < 0.1) {
+            priv->grabbed   = TRUE;
+            priv->dragged_x = egg_data_points_get_x (priv->points, closest);
+            priv->dragged_y = egg_data_points_get_y (priv->points, closest);
+            priv->dragged_index = closest;
 
-    if (ABS ((x * (priv->n_points - 1)) - rx) < 0.1) {
-        priv->dragged = (guint) rx;
-        g_assert (priv->dragged < priv->n_points);
+            set_cursor_type (view, GDK_FLEUR);
+        }
     }
-
-    view->priv->grabbed = TRUE;
-    set_cursor_type (view, GDK_FLEUR);
 
     return TRUE;
 }
@@ -247,11 +284,14 @@ egg_piecewise_linear_button_release (GtkWidget *widget, GdkEventButton *event)
     if (event->button != 1)
         return TRUE;
 
+    if (priv->grabbed) {
+        g_signal_emit (view, 
+                       egg_piecewise_linear_view_signals[POINT_CHANGED], 
+                       0, priv->dragged_index);
+    }
+
     priv->grabbed = FALSE;
     set_cursor_type (view, GDK_TCROSS);
-
-    g_signal_emit (view, egg_piecewise_linear_view_signals[POINT_CHANGED], 0, priv->dragged, priv->points[priv->dragged]);
-
     return TRUE;
 }
 
@@ -260,41 +300,33 @@ egg_piecewise_linear_motion_notify (GtkWidget *widget, GdkEventMotion *event)
 {
     EggPiecewiseLinearViewPrivate
                     *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (widget);
-    GtkAllocation    allocation;
     GdkCursorType    cursor_type = GDK_TCROSS;
-    gint             border;
-    gint             width;
-    gint             height;
-    gdouble          x;
-    gdouble          rounded_x;
+    gdouble          x, y;
+    guint            n_points;
+    gdouble          distance;
+    guint            closest;
 
-    gtk_widget_get_allocation (widget, &allocation);
-    border = priv->border_width;
-    width  = allocation.width - 2 * border;
-    height = allocation.height - 2 * border;
-    x = (gdouble) (event->x - border) / (gdouble) width;
-
-    rounded_x = floor(x * (priv->n_points - 1) + 0.5);
+    get_closest_point (widget, event->x, event->y, &x, &y, &closest, &distance);
+    n_points = egg_data_points_get_num (priv->points);
 
     if (!priv->grabbed) {
-        if (ABS ((x * (priv->n_points - 1)) - rounded_x) < 0.1) {
-            cursor_type = GDK_FLEUR;
+        if (!priv->fixed_borders || (closest > 0 && closest < n_points - 1)) {
+            if (distance < 0.1)
+                cursor_type = GDK_FLEUR;
         }
     }
     else {
-        gdouble y;
+        if (!priv->fixed_x)
+            gtk_adjustment_set_value (priv->dragged_x, x);
 
-        y = (gdouble) (height - event->y - border) / (gdouble) height;
-        y = CLAMP (y, 0.0, 1.0);
-        y *= priv->max;
-        priv->points[priv->dragged] = (gint) y;
+        if (!priv->fixed_y)
+            gtk_adjustment_set_value (priv->dragged_y, y);
 
         cursor_type = GDK_FLEUR;
+        gtk_widget_queue_draw (widget);
     }
 
     set_cursor_type (EGG_PIECEWISE_LINEAR_VIEW (widget), cursor_type);
-    gtk_widget_queue_draw (widget);
-
     return TRUE;
 }
 
@@ -310,52 +342,15 @@ egg_piecewise_linear_view_set_property (GObject        *object,
     priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (object);
 
     switch (property_id) {
-        case PROP_NUM_POINTS:
-            {
-                guint n_points = g_value_get_uint (value);
-
-                if (n_points < 1) {
-                    g_warning ("Not enough points");
-                    return;
-                }
-
-                priv->points = g_realloc_n (priv->points, n_points, sizeof (gint));
-
-                if (n_points > priv->n_points) {
-                    for (guint i = priv->n_points - 1; i < n_points; i++)
-                        priv->points[i] = 0;
-                }
-
-                priv->n_points = n_points;
-            }
+        case PROP_FIXED_X:
+            priv->fixed_x = g_value_get_boolean (value);
             break;
-
-        case PROP_MIN:
-            {
-                gint min = g_value_get_int (value);
-
-                if (min > priv->max)
-                    g_warning ("%i < %i is not possible", min, priv->max);
-                else {
-                    priv->min = min;
-                    clamp_points (priv);
-                }
-            }
+        case PROP_FIXED_Y:
+            priv->fixed_y = g_value_get_boolean (value);
             break;
-
-        case PROP_MAX:
-            {
-                gint max = g_value_get_int (value);
-
-                if (max < priv->min)
-                    g_warning ("%i < %i is not possible", priv->min, max);
-                else {
-                    priv->max = max;
-                    clamp_points (priv);
-                }
-            }
+        case PROP_FIXED_BORDERS:
+            priv->fixed_borders = g_value_get_boolean (value);
             break;
-
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
             return;
@@ -374,14 +369,14 @@ egg_piecewise_linear_view_get_property (GObject    *object,
     priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (object);
 
     switch (property_id) {
-        case PROP_NUM_POINTS:
-            g_value_set_uint (value, priv->n_points);
+        case PROP_FIXED_X:
+            g_value_set_boolean (value, priv->fixed_x);
             break;
-        case PROP_MIN:
-            g_value_set_int (value, priv->min);
+        case PROP_FIXED_Y:
+            g_value_set_boolean (value, priv->fixed_y);
             break;
-        case PROP_MAX:
-            g_value_set_int (value, priv->max);
+        case PROP_FIXED_BORDERS:
+            g_value_set_boolean (value, priv->fixed_borders);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -397,6 +392,7 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
 
     gobject_class->set_property = egg_piecewise_linear_view_set_property;
     gobject_class->get_property = egg_piecewise_linear_view_get_property;
+    /* TODO: add dispose and unref points */
 
     widget_class->size_request = egg_piecewise_linear_view_size_request;
     widget_class->expose_event = egg_piecewise_linear_view_expose;
@@ -404,26 +400,26 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
     widget_class->button_release_event = egg_piecewise_linear_button_release;
     widget_class->motion_notify_event = egg_piecewise_linear_motion_notify;
 
-    egg_piecewise_linear_view_properties[PROP_NUM_POINTS] =
-        g_param_spec_uint("num-points",
-                          "Number of data points",
-                          "Number of data points",
-                          1, G_MAXUINT, 2,
-                          G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+    egg_piecewise_linear_view_properties[PROP_FIXED_X] =
+        g_param_spec_boolean ("fixed-x",
+                              "TRUE if x values cannot be changed",
+                              "TRUE if x values cannot be changed",
+                              FALSE,
+                              G_PARAM_READWRITE);
 
-    egg_piecewise_linear_view_properties[PROP_MIN] =
-        g_param_spec_int("min",
-                          "Minimum of the range",
-                          "Minimum of the range",
-                          -G_MAXINT, G_MAXINT, 0,
-                          G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+    egg_piecewise_linear_view_properties[PROP_FIXED_Y] =
+        g_param_spec_boolean ("fixed-y",
+                              "TRUE if y values cannot be changed",
+                              "TRUE if y values cannot be changed",
+                              FALSE,
+                              G_PARAM_READWRITE);
 
-    egg_piecewise_linear_view_properties[PROP_MAX] =
-        g_param_spec_int("max",
-                          "Maximum of the range",
-                          "Maximum of the range",
-                          -G_MAXINT, G_MAXINT, 1,
-                          G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+    egg_piecewise_linear_view_properties[PROP_FIXED_BORDERS] =
+        g_param_spec_boolean ("fixed-borders",
+                              "TRUE if border values cannot be changed",
+                              "TRUE if border values cannot be changed",
+                              FALSE,
+                              G_PARAM_READWRITE);
 
     g_object_class_install_properties (gobject_class,
                                        N_PROPERTIES,
@@ -449,12 +445,11 @@ egg_piecewise_linear_view_init (EggPiecewiseLinearView *view)
 
     view->priv = priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
     priv->border_width = 2;
-    priv->n_points  = 0;
     priv->points    = NULL;
     priv->grabbed   = FALSE;
-    priv->dragged   = 0;
-    priv->min       = 0;
-    priv->max       = 1;
+    priv->fixed_x   = FALSE;
+    priv->fixed_y   = FALSE;
+    priv->fixed_borders = FALSE;
 
     gtk_widget_add_events (GTK_WIDGET (view),
                            GDK_BUTTON_PRESS_MASK   |

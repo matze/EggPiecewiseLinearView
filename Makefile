@@ -1,7 +1,7 @@
 CFLAGS=`pkg-config --cflags gtk+-2.0` -g -ggdb -Wall -Werror -std=c99
 LDFLAGS=`pkg-config --libs gtk+-2.0`
 DEPS=egg-piecewise-linear-view.h
-OBJ=pwl-test.o egg-piecewise-linear-view.o
+OBJ=pwl-test.o egg-piecewise-linear-view.o egg-data-points.o
 
 all: pwl-test
 

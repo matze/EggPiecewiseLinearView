@@ -19,6 +19,7 @@
 #define EGG_PIECEWISE_LINEAR_VIEW_H
 
 #include <gtk/gtk.h>
+#include "egg-data-points.h"
 
 G_BEGIN_DECLS
 
@@ -49,22 +50,12 @@ struct _EggPiecewiseLinearViewClass
     void (* point_changed)  (EggPiecewiseLinearView *view, guint index, gint value);
 };
 
-GType       egg_piecewise_linear_view_get_type              (void);
-GtkWidget * egg_piecewise_linear_view_new                   (guint                   n_points,
-                                                             gint                    min,
-                                                             gint                    max);
-void        egg_piecewise_linear_view_set_number_of_points  (EggPiecewiseLinearView *view,
-                                                             guint                   n_points);
-void        egg_piecewise_linear_view_set_point             (EggPiecewiseLinearView *view,
-                                                             guint                   index,
-                                                             gint                    value);
-void        egg_piecewise_linear_view_set_range             (EggPiecewiseLinearView *view,
-                                                             gint                    min,
-                                                             gint                    max);
-void        egg_piecewise_linear_view_get_point             (EggPiecewiseLinearView *view,
-                                                             guint                   index,
-                                                             gint                   *x,
-                                                             gint                   *y);
+GType           egg_piecewise_linear_view_get_type      (void);
+GtkWidget     * egg_piecewise_linear_view_new           (void);
+void            egg_piecewise_linear_view_set_points    (EggPiecewiseLinearView *view,
+                                                         EggDataPoints          *points);
+EggDataPoints * egg_piecewise_linear_view_get_points    (EggPiecewiseLinearView *view);
+
 
 G_END_DECLS
 

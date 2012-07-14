@@ -16,6 +16,7 @@
    Franklin St, Fifth Floor, Boston, MA 02110, USA */
 
 #include <gtk/gtk.h>
+#include "egg-data-points.h"
 #include "egg-piecewise-linear-view.h"
 
 static gboolean
@@ -25,20 +26,27 @@ on_delete_event (GtkWidget *widget, GdkEvent *event, gpointer user_data)
 }
 
 static void
-on_point_changed (EggPiecewiseLinearView *view, guint index, gpointer user_data)
+on_point_changed (EggPiecewiseLinearView *view, guint index)
 {
-    gint x, y;
+    EggDataPoints *points;
 
-    egg_piecewise_linear_view_get_point (view, index, &x, &y);
-    g_print ("data point %i changed to %i\n", index, y);
+    points = egg_piecewise_linear_view_get_points (view);
+    g_print ("point set to (%f, %f)\n",
+             egg_data_points_get_x_value (points, index),
+             egg_data_points_get_y_value (points, index));
 }
 
 int
 main (int argc, char* argv[])
 {
-    GtkWidget *window; 
+    GtkWidget *window;
+    GtkWidget *container;
     GtkWidget *view;
-    EggPiecewiseLinearView *pwl;
+    GtkWidget *fixed_button_box;
+    GtkWidget *fixed_x_button;
+    GtkWidget *fixed_y_button;
+    GtkWidget *fixed_borders_button;
+    EggDataPoints *points;
 
     gtk_init (&argc, &argv);
 
@@ -47,15 +55,44 @@ main (int argc, char* argv[])
     g_signal_connect (window, "delete-event", G_CALLBACK (on_delete_event), NULL);
     g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
 
-    view = egg_piecewise_linear_view_new (3, 0, 300);
-    pwl = EGG_PIECEWISE_LINEAR_VIEW (view);
-    egg_piecewise_linear_view_set_point (pwl, 0, 0);
-    egg_piecewise_linear_view_set_point (pwl, 1, 100);
-    egg_piecewise_linear_view_set_point (pwl, 2, 200);
+    points = egg_data_points_new (0.0, 2.0, 0.0, 300.0);
+    egg_data_points_add_point (points, 0.0, 0.0, 1.0);
+    egg_data_points_add_point (points, 1.0, 100.0, 1.0);
+    egg_data_points_add_point (points, 2.0, 200.0, 1.0);
+
+    view = egg_piecewise_linear_view_new ();
+    egg_piecewise_linear_view_set_points (EGG_PIECEWISE_LINEAR_VIEW (view), points);
 
     g_signal_connect (view, "point-changed", G_CALLBACK (on_point_changed), NULL);
 
-    gtk_container_add (GTK_CONTAINER (window), view);
+#if GTK_CHECK_VERSION(3, 2, 0)
+    container = gtk_box_new (GTK_ORIENTATION_VERTICAL, 6);
+#else
+    container = gtk_vbox_new (FALSE, 6);
+#endif
+
+#if GTK_CHECK_VERSION(3, 2, 0)
+    fixed_button_box = gtk_button_box_new (GTK_ORIENTATION_HORIZONTAL);
+#else
+    fixed_button_box = gtk_hbutton_box_new ();
+#endif
+
+    fixed_x_button = gtk_check_button_new_with_label ("Fixed X");
+    fixed_y_button = gtk_check_button_new_with_label ("Fixed Y");
+    fixed_borders_button = gtk_check_button_new_with_label ("Fixed Borders");
+
+    g_object_bind_property (fixed_x_button, "active", view, "fixed-x", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_y_button, "active", view, "fixed-y", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_borders_button, "active", view, "fixed-borders", G_BINDING_BIDIRECTIONAL);
+
+    gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_x_button, TRUE, TRUE, 3);
+    gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_y_button, TRUE, TRUE, 3);
+    gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_borders_button, TRUE, TRUE, 3);
+
+    gtk_box_pack_start (GTK_BOX (container), view, TRUE, TRUE, 6);
+    gtk_box_pack_start (GTK_BOX (container), fixed_button_box, FALSE, TRUE, 6);
+
+    gtk_container_add (GTK_CONTAINER (window), container);
     gtk_widget_show_all (window);
     gtk_main ();
 
