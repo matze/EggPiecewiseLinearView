@@ -45,6 +45,8 @@ struct _EggPiecewiseLinearViewPrivate
     gboolean        grid_y;
     gdouble         grid_x_increment;
     gdouble         grid_y_increment;
+    gboolean        snap_to_x;
+    gboolean        snap_to_y;
 };
 
 enum
@@ -54,6 +56,8 @@ enum
     PROP_GRID_Y,
     PROP_GRID_X_INCREMENT,
     PROP_GRID_Y_INCREMENT,
+    PROP_SNAP_TO_X,
+    PROP_SNAP_TO_Y,
     PROP_FIXED_X,
     PROP_FIXED_Y,
     PROP_FIXED_BORDERS,
@@ -166,9 +170,9 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
             gdouble xp = x;
             map_x_to_window (&xp, xscale, width);
             xp += border;
-            cairo_move_to (cr, floor (xp), border);             
+            cairo_move_to (cr, floor (xp), border);
             cairo_line_to (cr, floor (xp), height);
-        } 
+        }
     }
 
     if (priv->grid_y) {
@@ -176,9 +180,9 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
             gdouble yp = y;
             map_y_to_window (&yp, yscale, height);
             yp += border;
-            cairo_move_to (cr, border, floor (yp));             
+            cairo_move_to (cr, border, floor (yp));
             cairo_line_to (cr, width, floor (yp));
-        } 
+        }
     }
 
     cairo_set_dash (cr, dashes, 2, 0.0);
@@ -297,6 +301,12 @@ egg_piecewise_linear_button_press (GtkWidget *widget, GdkEventButton *event)
     return TRUE;
 }
 
+static gdouble
+snap_value (gdouble v, gdouble increment)
+{
+    return floor (v / increment + 0.5) * increment;
+}
+
 static gboolean
 egg_piecewise_linear_button_release (GtkWidget *widget, GdkEventButton *event)
 {
@@ -309,8 +319,28 @@ egg_piecewise_linear_button_release (GtkWidget *widget, GdkEventButton *event)
         return TRUE;
 
     if (priv->grabbed) {
-        g_signal_emit (view, 
-                       egg_piecewise_linear_view_signals[POINT_CHANGED], 
+        if (priv->grid_x && priv->snap_to_x) {
+            GtkAdjustment *adj;
+            gdouble        x;
+
+            adj = egg_data_points_get_x (priv->points, priv->dragged_index);
+            x = gtk_adjustment_get_value (adj);
+            gtk_adjustment_set_value (adj, snap_value (x, priv->grid_x_increment));
+        }
+
+        if (priv->grid_y && priv->snap_to_y) {
+            GtkAdjustment *adj;
+            gdouble        y;
+
+            adj = egg_data_points_get_y (priv->points, priv->dragged_index);
+            y = gtk_adjustment_get_value (adj);
+            gtk_adjustment_set_value (adj, snap_value (y, priv->grid_y_increment));
+        }
+
+        gtk_widget_queue_draw (widget);
+
+        g_signal_emit (view,
+                       egg_piecewise_linear_view_signals[POINT_CHANGED],
                        0, priv->dragged_index);
     }
 
@@ -372,6 +402,18 @@ egg_piecewise_linear_view_set_property (GObject        *object,
         case PROP_GRID_Y:
             priv->grid_y = g_value_get_boolean (value);
             break;
+        case PROP_SNAP_TO_X:
+            priv->snap_to_x = g_value_get_boolean (value);
+            break;
+        case PROP_SNAP_TO_Y:
+            priv->snap_to_y = g_value_get_boolean (value);
+            break;
+        case PROP_GRID_X_INCREMENT:
+            priv->grid_x_increment = g_value_get_double (value);
+            break;
+        case PROP_GRID_Y_INCREMENT:
+            priv->grid_y_increment = g_value_get_double (value);
+            break;
         case PROP_FIXED_X:
             priv->fixed_x = g_value_get_boolean (value);
             break;
@@ -385,6 +427,8 @@ egg_piecewise_linear_view_set_property (GObject        *object,
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
             return;
     }
+
+    gtk_widget_queue_draw (GTK_WIDGET (object));
 }
 
 static void
@@ -404,6 +448,18 @@ egg_piecewise_linear_view_get_property (GObject    *object,
             break;
         case PROP_GRID_Y:
             g_value_set_boolean (value, priv->grid_y);
+            break;
+        case PROP_SNAP_TO_X:
+            g_value_set_boolean (value, priv->snap_to_x);
+            break;
+        case PROP_SNAP_TO_Y:
+            g_value_set_boolean (value, priv->snap_to_y);
+            break;
+        case PROP_GRID_X_INCREMENT:
+            g_value_set_double (value, priv->grid_x_increment);
+            break;
+        case PROP_GRID_Y_INCREMENT:
+            g_value_set_double (value, priv->grid_y_increment);
             break;
         case PROP_FIXED_X:
             g_value_set_boolean (value, priv->fixed_x);
@@ -448,16 +504,30 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
     widget_class->motion_notify_event = egg_piecewise_linear_motion_notify;
 
     egg_piecewise_linear_view_properties[PROP_GRID_X] =
-        g_param_spec_boolean ("show-x-grid",
+        g_param_spec_boolean ("x-grid",
                               "TRUE if grid on x-axis should be shown",
                               "TRUE if grid on x-axis should be shown",
-                              FALSE,
+                              TRUE,
                               G_PARAM_READWRITE);
 
     egg_piecewise_linear_view_properties[PROP_GRID_Y] =
-        g_param_spec_boolean ("show-y-grid",
+        g_param_spec_boolean ("y-grid",
                               "TRUE if grid on y-axis should be shown",
                               "TRUE if grid on y-axis should be shown",
+                              TRUE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_SNAP_TO_X] =
+        g_param_spec_boolean ("snap-to-x",
+                              "TRUE if points should snap to x-axis",
+                              "TRUE if points should snap to x-axis",
+                              FALSE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_SNAP_TO_Y] =
+        g_param_spec_boolean ("snap-to-y",
+                              "TRUE if points should snap to y-axis",
+                              "TRUE if points should snap to y-axis",
                               FALSE,
                               G_PARAM_READWRITE);
 
@@ -524,11 +594,13 @@ egg_piecewise_linear_view_init (EggPiecewiseLinearView *view)
     priv->grabbed   = FALSE;
     priv->grid_x    = TRUE;
     priv->grid_y    = TRUE;
+    priv->snap_to_x = FALSE;
+    priv->snap_to_y = FALSE;
     priv->fixed_x   = FALSE;
     priv->fixed_y   = FALSE;
     priv->fixed_borders = FALSE;
     priv->grid_x_increment = 1.0;
-    priv->grid_y_increment = 100.0;
+    priv->grid_y_increment = 1.0;
 
     gtk_widget_add_events (GTK_WIDGET (view),
                            GDK_BUTTON_PRESS_MASK   |

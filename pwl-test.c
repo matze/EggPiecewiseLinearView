@@ -46,6 +46,13 @@ main (int argc, char* argv[])
     GtkWidget *fixed_x_button;
     GtkWidget *fixed_y_button;
     GtkWidget *fixed_borders_button;
+    GtkWidget *grid_button_box;
+    GtkWidget *grid_x_button;
+    GtkWidget *grid_y_button;
+    GtkWidget *grid_x_enable_button;
+    GtkWidget *grid_y_enable_button;
+    GtkAdjustment *grid_x;
+    GtkAdjustment *grid_y;
     EggDataPoints *points;
 
     gtk_init (&argc, &argv);
@@ -55,6 +62,7 @@ main (int argc, char* argv[])
     g_signal_connect (window, "delete-event", G_CALLBACK (on_delete_event), NULL);
     g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
 
+    /* Add some points */
     points = egg_data_points_new (0.0, 2.0, 0.0, 300.0);
     egg_data_points_add_point (points, 0.0, 0.0, 1.0);
     egg_data_points_add_point (points, 1.0, 100.0, 1.0);
@@ -71,28 +79,60 @@ main (int argc, char* argv[])
     container = gtk_vbox_new (FALSE, 6);
 #endif
 
+    /* Create fix buttons */
 #if GTK_CHECK_VERSION(3, 2, 0)
     fixed_button_box = gtk_button_box_new (GTK_ORIENTATION_HORIZONTAL);
+    grid_button_box  = gtk_button_box_new (GTK_ORIENTATION_HORIZONTAL);
 #else
     fixed_button_box = gtk_hbutton_box_new ();
+    grid_button_box  = gtk_hbutton_box_new ();
 #endif
 
     fixed_x_button = gtk_check_button_new_with_label ("Fixed X");
     fixed_y_button = gtk_check_button_new_with_label ("Fixed Y");
     fixed_borders_button = gtk_check_button_new_with_label ("Fixed Borders");
 
-    g_object_bind_property (fixed_x_button, "active", view, "fixed-x", G_BINDING_BIDIRECTIONAL);
-    g_object_bind_property (fixed_y_button, "active", view, "fixed-y", G_BINDING_BIDIRECTIONAL);
-    g_object_bind_property (fixed_borders_button, "active", view, "fixed-borders", G_BINDING_BIDIRECTIONAL);
+    /* Create grid buttons */
+    grid_x_enable_button = gtk_check_button_new_with_label ("Snap to X");
+    grid_y_enable_button = gtk_check_button_new_with_label ("Snap to Y");
+    grid_x = GTK_ADJUSTMENT (gtk_adjustment_new (1.0, 0.1, 3.0, 0.01, 1.0, 0.0));
+    grid_y = GTK_ADJUSTMENT (gtk_adjustment_new (10.0, 1.0, 300.0, 1.0, 10.0, 0.0));
 
+    grid_x_button = gtk_spin_button_new (grid_x, 0.1, 3);
+    grid_y_button = gtk_spin_button_new (grid_y, 1.0, 3);
+
+    /* Layout the widgets */
     gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_x_button, TRUE, TRUE, 3);
     gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_y_button, TRUE, TRUE, 3);
     gtk_box_pack_start (GTK_BOX (fixed_button_box), fixed_borders_button, TRUE, TRUE, 3);
 
+    gtk_box_pack_start (GTK_BOX (grid_button_box), grid_x_enable_button, TRUE, TRUE, 3);
+    gtk_box_pack_start (GTK_BOX (grid_button_box), grid_x_button, TRUE, TRUE, 3);
+    gtk_box_pack_start (GTK_BOX (grid_button_box), grid_y_enable_button, TRUE, TRUE, 3);
+    gtk_box_pack_start (GTK_BOX (grid_button_box), grid_y_button, TRUE, TRUE, 3);
+
     gtk_box_pack_start (GTK_BOX (container), view, TRUE, TRUE, 6);
     gtk_box_pack_start (GTK_BOX (container), fixed_button_box, FALSE, TRUE, 6);
+    gtk_box_pack_start (GTK_BOX (container), grid_button_box, FALSE, TRUE, 6);
 
     gtk_container_add (GTK_CONTAINER (window), container);
+
+    /* Connect widgets with properties */
+    g_object_bind_property (fixed_x_button, "active", view, "fixed-x", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_y_button, "active", view, "fixed-y", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_borders_button, "active", view, "fixed-borders", G_BINDING_BIDIRECTIONAL);
+
+    g_object_bind_property (grid_x_enable_button, "active", view, "snap-to-x", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (grid_y_enable_button, "active", view, "snap-to-y", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (grid_x, "value", view, "x-grid-increment", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (grid_y, "value", view, "y-grid-increment", G_BINDING_BIDIRECTIONAL);
+
+    /* Initialize the view with something useful */
+    g_object_set (view,
+                  "x-grid-increment", 1.0,
+                  "y-grid-increment", 50.0,
+                  NULL);
+
     gtk_widget_show_all (window);
     gtk_main ();
 
