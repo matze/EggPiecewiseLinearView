@@ -89,7 +89,7 @@ egg_data_points_get_y_range (EggDataPoints *points,
     *upper_y = points->priv->upper_y;
 }
 
-void
+guint
 egg_data_points_add_point (EggDataPoints *data_points,
                            gdouble        x,
                            gdouble        y,
@@ -99,7 +99,7 @@ egg_data_points_add_point (EggDataPoints *data_points,
     GtkAdjustment *x_adj;
     GtkAdjustment *y_adj;
 
-    g_return_if_fail (EGG_IS_DATA_POINTS (data_points));
+    g_return_val_if_fail (EGG_IS_DATA_POINTS (data_points), 0);
 
     priv  = EGG_DATA_POINTS_GET_PRIVATE (data_points);
     x_adj = GTK_ADJUSTMENT (gtk_adjustment_new (x, priv->lower_x, priv->upper_x, increment, 10, 0));
@@ -109,6 +109,8 @@ egg_data_points_add_point (EggDataPoints *data_points,
     g_object_ref_sink (y_adj);
     g_ptr_array_add (priv->x_adjustments, x_adj);
     g_ptr_array_add (priv->y_adjustments, y_adj);
+    
+    return priv->x_adjustments->len - 1;
 }
 
 guint

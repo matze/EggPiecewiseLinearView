@@ -49,40 +49,40 @@ struct _EggDataPointsClass
     void (* point_changed)  (EggDataPoints *view, guint index);
 };
 
-GType             egg_data_points_get_type  (void);
-EggDataPoints   * egg_data_points_new       (gdouble        lower_x,
-                                             gdouble        upper_x,
-                                             gdouble        lower_y,
-                                             gdouble        upper_y);
-void              egg_data_points_get_x_range (EggDataPoints *data_points,
-                                               gdouble       *lower_x,
-                                               gdouble       *upper_x);
-void              egg_data_points_get_y_range (EggDataPoints *data_points,
-                                               gdouble       *lower_y,
-                                               gdouble       *upper_y);
-void              egg_data_points_add_point (EggDataPoints *data_points,
-                                             gdouble        x,
-                                             gdouble        y,
-                                             gdouble        increment);
-guint             egg_data_points_get_num   (EggDataPoints *data_points);
-GtkAdjustment   * egg_data_points_get_x     (EggDataPoints *data_points,
-                                             guint          index);
-GtkAdjustment   * egg_data_points_get_y     (EggDataPoints *data_points,
-                                             guint          index);
-gdouble           egg_data_points_get_x_value (EggDataPoints *data_points,
-                                               guint          index);
-gdouble           egg_data_points_get_y_value (EggDataPoints *data_points,
-                                               guint          index);
-void              egg_data_points_set_x     (EggDataPoints *data_points,
-                                             guint          index,
-                                             gdouble        value);
-void              egg_data_points_set_y     (EggDataPoints *data_points,
-                                             guint          index,
-                                             gdouble        value);
-guint             egg_data_get_closest_point (EggDataPoints *data_points,
-                                              gdouble        x,
-                                              gdouble        y,
-                                              gdouble       *distance);
+GType             egg_data_points_get_type      (void);
+EggDataPoints   * egg_data_points_new           (gdouble        lower_x,
+                                                 gdouble        upper_x,
+                                                 gdouble        lower_y,
+                                                 gdouble        upper_y);
+void              egg_data_points_get_x_range   (EggDataPoints *data_points,
+                                                 gdouble       *lower_x,
+                                                 gdouble       *upper_x);
+void              egg_data_points_get_y_range   (EggDataPoints *data_points,
+                                                 gdouble       *lower_y,
+                                                 gdouble       *upper_y);
+guint             egg_data_points_add_point     (EggDataPoints *data_points,
+                                                 gdouble        x,
+                                                 gdouble        y,
+                                                 gdouble        increment);
+guint             egg_data_points_get_num       (EggDataPoints *data_points);
+GtkAdjustment   * egg_data_points_get_x         (EggDataPoints *data_points,
+                                                 guint          index);
+GtkAdjustment   * egg_data_points_get_y         (EggDataPoints *data_points,
+                                                 guint          index);
+gdouble           egg_data_points_get_x_value   (EggDataPoints *data_points,
+                                                 guint          index);
+gdouble           egg_data_points_get_y_value   (EggDataPoints *data_points,
+                                                 guint          index);
+void              egg_data_points_set_x         (EggDataPoints *data_points,
+                                                 guint          index,
+                                                 gdouble        value);
+void              egg_data_points_set_y         (EggDataPoints *data_points,
+                                                 guint          index,
+                                                 gdouble        value);
+guint             egg_data_get_closest_point    (EggDataPoints *data_points,
+                                                 gdouble        x,
+                                                 gdouble        y,
+                                                 gdouble       *distance);
 
 G_END_DECLS
 
