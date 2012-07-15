@@ -105,6 +105,8 @@ egg_data_points_add_point (EggDataPoints *data_points,
     x_adj = GTK_ADJUSTMENT (gtk_adjustment_new (x, priv->lower_x, priv->upper_x, increment, 10, 0));
     y_adj = GTK_ADJUSTMENT (gtk_adjustment_new (y, priv->lower_y, priv->upper_y, increment, 10, 0));
 
+    g_object_ref_sink (x_adj);
+    g_object_ref_sink (y_adj);
     g_ptr_array_add (priv->x_adjustments, x_adj);
     g_ptr_array_add (priv->y_adjustments, y_adj);
 }
@@ -305,12 +307,48 @@ egg_data_points_get_property (GObject    *object,
 }
 
 static void
+egg_data_points_dispose (GObject *object)
+{
+    EggDataPointsPrivate *priv;
+
+    priv = EGG_DATA_POINTS_GET_PRIVATE (object);
+
+    for (guint i = 0; i < priv->x_adjustments->len; i++) {
+        GObject *adj;
+
+        adj = G_OBJECT (g_ptr_array_index (priv->x_adjustments, i));
+        g_object_unref (adj);
+
+        adj = G_OBJECT (g_ptr_array_index (priv->y_adjustments, i));
+        g_object_unref (adj);
+    }
+
+    G_OBJECT_CLASS (egg_data_points_parent_class)->dispose (object);
+}
+
+static void
+egg_data_points_finalize (GObject *object)
+{
+    EggDataPointsPrivate *priv;
+
+    priv = EGG_DATA_POINTS_GET_PRIVATE (object);
+    g_ptr_array_free (priv->x_adjustments, TRUE);
+    g_ptr_array_free (priv->y_adjustments, TRUE);
+    priv->x_adjustments = NULL;
+    priv->y_adjustments = NULL;
+
+    G_OBJECT_CLASS (egg_data_points_parent_class)->finalize (object);
+}
+
+static void
 egg_data_points_class_init (EggDataPointsClass *klass)
 {
     GObjectClass    *gobject_class = G_OBJECT_CLASS (klass);
 
     gobject_class->set_property = egg_data_points_set_property;
     gobject_class->get_property = egg_data_points_get_property;
+    gobject_class->dispose  = egg_data_points_dispose;
+    gobject_class->finalize = egg_data_points_finalize;
 
     egg_data_points_properties[PROP_LOWER_X] =
         g_param_spec_double ("lower-x",

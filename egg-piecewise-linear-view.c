@@ -421,6 +421,17 @@ egg_piecewise_linear_view_get_property (GObject    *object,
 }
 
 static void
+egg_piecewise_linear_view_dispose (GObject *object)
+{
+    EggPiecewiseLinearViewPrivate *priv;
+
+    priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (object);
+    g_object_unref (priv->points);
+
+    G_OBJECT_CLASS (egg_piecewise_linear_view_parent_class)->dispose (object);
+}
+
+static void
 egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
 {
     GObjectClass    *gobject_class = G_OBJECT_CLASS (klass);
@@ -428,7 +439,7 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
 
     gobject_class->set_property = egg_piecewise_linear_view_set_property;
     gobject_class->get_property = egg_piecewise_linear_view_get_property;
-    /* TODO: add dispose and unref points */
+    gobject_class->dispose = egg_piecewise_linear_view_dispose;
 
     widget_class->size_request = egg_piecewise_linear_view_size_request;
     widget_class->expose_event = egg_piecewise_linear_view_expose;
