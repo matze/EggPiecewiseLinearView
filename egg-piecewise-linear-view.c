@@ -41,11 +41,19 @@ struct _EggPiecewiseLinearViewPrivate
     gboolean        fixed_x;
     gboolean        fixed_y;
     gboolean        fixed_borders;
+    gboolean        grid_x;
+    gboolean        grid_y;
+    gdouble         grid_x_increment;
+    gdouble         grid_y_increment;
 };
 
 enum
 {
     PROP_0,
+    PROP_GRID_X,
+    PROP_GRID_Y,
+    PROP_GRID_X_INCREMENT,
+    PROP_GRID_Y_INCREMENT,
     PROP_FIXED_X,
     PROP_FIXED_Y,
     PROP_FIXED_BORDERS,
@@ -110,6 +118,8 @@ map_y_to_window (gdouble *y, gdouble yscale, gdouble height)
 static gboolean
 egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
 {
+    const static gdouble dashes[2] = { 0.5, 4.0 };
+
     EggPiecewiseLinearViewPrivate
                     *priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (widget);
     GtkStyle        *style = gtk_widget_get_style (widget);
@@ -150,6 +160,30 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
     xscale = upper_x - lower_x;
     yscale = upper_y - lower_y;
 
+    /* Draw grid */
+    if (priv->grid_x) {
+        for (gdouble x = lower_x + priv->grid_x_increment; x < upper_x; x += priv->grid_x_increment) {
+            gdouble xp = x;
+            map_x_to_window (&xp, xscale, width);
+            xp += border;
+            cairo_move_to (cr, floor (xp), border);             
+            cairo_line_to (cr, floor (xp), height);
+        } 
+    }
+
+    if (priv->grid_y) {
+        for (gdouble y = lower_y + priv->grid_y_increment; y < upper_y; y += priv->grid_y_increment) {
+            gdouble yp = y;
+            map_y_to_window (&yp, yscale, height);
+            yp += border;
+            cairo_move_to (cr, border, floor (yp));             
+            cairo_line_to (cr, width, floor (yp));
+        } 
+    }
+
+    cairo_set_dash (cr, dashes, 2, 0.0);
+    cairo_stroke (cr);
+
     /* Draw lines */
     n_points = egg_data_points_get_num (priv->points);
     x = egg_data_points_get_x_value (priv->points, 0);
@@ -168,6 +202,7 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
         cairo_line_to (cr, x + border, y + border);
     }
 
+    cairo_set_dash (cr, NULL, 0, 0.0);
     cairo_stroke (cr);
 
     /* Draw points */
@@ -331,6 +366,12 @@ egg_piecewise_linear_view_set_property (GObject        *object,
     priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (object);
 
     switch (property_id) {
+        case PROP_GRID_X:
+            priv->grid_x = g_value_get_boolean (value);
+            break;
+        case PROP_GRID_Y:
+            priv->grid_y = g_value_get_boolean (value);
+            break;
         case PROP_FIXED_X:
             priv->fixed_x = g_value_get_boolean (value);
             break;
@@ -358,6 +399,12 @@ egg_piecewise_linear_view_get_property (GObject    *object,
     priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (object);
 
     switch (property_id) {
+        case PROP_GRID_X:
+            g_value_set_boolean (value, priv->grid_x);
+            break;
+        case PROP_GRID_Y:
+            g_value_set_boolean (value, priv->grid_y);
+            break;
         case PROP_FIXED_X:
             g_value_set_boolean (value, priv->fixed_x);
             break;
@@ -388,6 +435,34 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
     widget_class->button_press_event = egg_piecewise_linear_button_press;
     widget_class->button_release_event = egg_piecewise_linear_button_release;
     widget_class->motion_notify_event = egg_piecewise_linear_motion_notify;
+
+    egg_piecewise_linear_view_properties[PROP_GRID_X] =
+        g_param_spec_boolean ("show-x-grid",
+                              "TRUE if grid on x-axis should be shown",
+                              "TRUE if grid on x-axis should be shown",
+                              FALSE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_GRID_Y] =
+        g_param_spec_boolean ("show-y-grid",
+                              "TRUE if grid on y-axis should be shown",
+                              "TRUE if grid on y-axis should be shown",
+                              FALSE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_GRID_X_INCREMENT] =
+        g_param_spec_double ("x-grid-increment",
+                             "Number of values to skip between x-axis grid lines",
+                             "Number of values to skip between x-axis grid lines",
+                             0.0, DBL_MAX, 1.0,
+                             G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_GRID_Y_INCREMENT] =
+        g_param_spec_double ("y-grid-increment",
+                             "Number of values to skip between y-axis grid lines",
+                             "Number of values to skip between y-axis grid lines",
+                             0.0, DBL_MAX, 1.0,
+                             G_PARAM_READWRITE);
 
     egg_piecewise_linear_view_properties[PROP_FIXED_X] =
         g_param_spec_boolean ("fixed-x",
@@ -436,9 +511,13 @@ egg_piecewise_linear_view_init (EggPiecewiseLinearView *view)
     priv->border_width = 2;
     priv->points    = NULL;
     priv->grabbed   = FALSE;
+    priv->grid_x    = TRUE;
+    priv->grid_y    = TRUE;
     priv->fixed_x   = FALSE;
     priv->fixed_y   = FALSE;
     priv->fixed_borders = FALSE;
+    priv->grid_x_increment = 1.0;
+    priv->grid_y_increment = 100.0;
 
     gtk_widget_add_events (GTK_WIDGET (view),
                            GDK_BUTTON_PRESS_MASK   |
