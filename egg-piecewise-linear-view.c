@@ -93,12 +93,6 @@ egg_piecewise_linear_view_size_request (GtkWidget *widget, GtkRequisition *requi
     requisition->height = MIN_HEIGHT;
 }
 
-/* static gdouble */
-/* map_point (guint y, gdouble upper_x, guint height) */
-/* { */
-/*     return height - height * y / upper_x; */
-/* } */
-
 static void
 map_x_to_window (gdouble *x, gdouble xscale, gdouble width)
 {
@@ -164,29 +158,28 @@ egg_piecewise_linear_view_expose (GtkWidget *widget, GdkEventExpose *event)
     cairo_set_line_width (cr, 1.5);
     map_x_to_window (&x, xscale, width);
     map_y_to_window (&y, yscale, height);
-    cairo_move_to (cr, x, y);
+    cairo_move_to (cr, x + border, y + border);
 
     for (guint i = 1; i < n_points; i++) {
         x = egg_data_points_get_x_value (priv->points, i);
         y = egg_data_points_get_y_value (priv->points, i);
         map_x_to_window (&x, xscale, width);
         map_y_to_window (&y, yscale, height);
-        cairo_line_to (cr, x, y);
+        cairo_line_to (cr, x + border, y + border);
     }
 
     cairo_stroke (cr);
 
-#define RADIUS 3
-
     /* Draw points */
+#define RADIUS 3
     for (guint i = 0; i < n_points; i++) {
         x = egg_data_points_get_x_value (priv->points, i);
         y = egg_data_points_get_y_value (priv->points, i);
         map_x_to_window (&x, xscale, width);
         map_y_to_window (&y, yscale, height);
-        cairo_move_to (cr, x + RADIUS, y);
-        cairo_arc (cr, x, y, RADIUS, 0, 2 * G_PI);
-        cairo_stroke (cr);
+        cairo_move_to (cr, x + RADIUS + border, y + border);
+        cairo_arc (cr, x + border, y + border, RADIUS, 0, 2 * G_PI);
+        cairo_fill (cr);
     }
 
     cairo_destroy (cr);
@@ -206,7 +199,7 @@ set_cursor_type (EggPiecewiseLinearView *view, GdkCursorType cursor_type)
 }
 
 static void
-get_closest_point (GtkWidget *widget, gint in_x, gint in_y, gdouble *out_x, gdouble *out_y, guint *index, gdouble *out_distance)
+get_closest_point (GtkWidget *widget, gint in_x, gint in_y, gdouble *out_x, gdouble *out_y, guint *index, gdouble *distance)
 {
     EggPiecewiseLinearView
                     *view = EGG_PIECEWISE_LINEAR_VIEW (widget);
@@ -218,8 +211,6 @@ get_closest_point (GtkWidget *widget, gint in_x, gint in_y, gdouble *out_x, gdou
     gdouble          lower_x, upper_x;
     gdouble          lower_y, upper_y;
     gdouble          x, y;
-    gdouble          distance;
-    guint            closest;
 
     gtk_widget_get_allocation (widget, &allocation);
     border = priv->border_width;
@@ -234,11 +225,9 @@ get_closest_point (GtkWidget *widget, gint in_x, gint in_y, gdouble *out_x, gdou
     x *= upper_x;
     y *= upper_y;
 
-    closest = egg_data_get_closest_point (priv->points, x, y, &distance);
+    *index = egg_data_get_closest_point (priv->points, x, y, distance);
     *out_x = x;
     *out_y = y;
-    *index = closest;
-    *out_distance = distance;
 }
 
 static gboolean
