@@ -43,7 +43,8 @@ enum
 
 enum
 {
-    POINT_CHANGED,
+    POINT_INSERTED,
+    POINT_REMOVED,
     LAST_SIGNAL
 };
 
@@ -109,8 +110,68 @@ egg_data_points_add_point (EggDataPoints *data_points,
     g_object_ref_sink (y_adj);
     g_ptr_array_add (priv->x_adjustments, x_adj);
     g_ptr_array_add (priv->y_adjustments, y_adj);
-    
+
     return priv->x_adjustments->len - 1;
+}
+
+/**
+ * egg_data_points_insert_point:
+ *
+ * Insert a new point at the given index and move subsequent indices. After
+ * insertion the "point-inserted::" signal is emitted.
+ */
+void
+egg_data_points_insert_point (EggDataPoints *points,
+                              guint          index,
+                              gdouble        x,
+                              gdouble        y)
+{
+    EggDataPointsPrivate *priv;
+    gpointer from_x;
+    gpointer from_y;
+    guint    from_index;
+    guint    n_points;
+
+    g_return_if_fail (EGG_IS_DATA_POINTS (points));
+
+    priv = EGG_DATA_POINTS_GET_PRIVATE (points);
+    g_return_if_fail (index < priv->x_adjustments->len);
+
+    /* Append the new point */
+    from_index = egg_data_points_add_point (points, x, y, 1.0);
+    n_points   = priv->x_adjustments->len;
+    from_x = egg_data_points_get_x (points, from_index);
+    from_y = egg_data_points_get_y (points, from_index);
+
+    for (guint i = index; i < n_points; i++) {
+        gpointer tmp_x = priv->x_adjustments->pdata[i];
+        gpointer tmp_y = priv->y_adjustments->pdata[i];
+
+        priv->x_adjustments->pdata[i] = from_x;
+        priv->y_adjustments->pdata[i] = from_y;
+        from_x = tmp_x;
+        from_y = tmp_y;
+    }
+
+    g_signal_emit (points, egg_data_points_signals[POINT_INSERTED], 0, index);
+}
+
+void
+egg_data_points_remove_point (EggDataPoints *points,
+                              guint          index)
+{
+    EggDataPointsPrivate *priv;
+    GObject *object;
+
+    g_return_if_fail (EGG_IS_DATA_POINTS (points));
+
+    priv = EGG_DATA_POINTS_GET_PRIVATE (points);
+    object = G_OBJECT (g_ptr_array_remove_index (priv->x_adjustments, index));
+    g_object_unref (object);
+    object = G_OBJECT (g_ptr_array_remove_index (priv->y_adjustments, index));
+    g_object_unref (object);
+
+    g_signal_emit (points, egg_data_points_signals[POINT_REMOVED], 0, index);
 }
 
 guint
@@ -221,7 +282,7 @@ egg_data_get_closest_point (EggDataPoints *points,
     EggDataPointsPrivate *priv;
     guint   index        = 0;
     gdouble min_distance = DBL_MAX;
-    
+
     g_return_val_if_fail (EGG_IS_DATA_POINTS (points), 0);
     priv = EGG_DATA_POINTS_GET_PRIVATE (points);
 
@@ -229,7 +290,7 @@ egg_data_get_closest_point (EggDataPoints *points,
         GtkAdjustment *x_adj;
         GtkAdjustment *y_adj;
         gdouble d, xp, yp;
-        
+
         x_adj = g_ptr_array_index (priv->x_adjustments, i);
         y_adj = g_ptr_array_index (priv->y_adjustments, i);
         xp = x - gtk_adjustment_get_value (x_adj);
@@ -239,7 +300,7 @@ egg_data_get_closest_point (EggDataPoints *points,
         d = sqrt (xp*xp + yp*yp);
 
         if (d < min_distance) {
-            index = i; 
+            index = i;
             min_distance = d;
         }
     }
@@ -384,8 +445,18 @@ egg_data_points_class_init (EggDataPointsClass *klass)
                                        N_PROPERTIES,
                                        egg_data_points_properties);
 
-    egg_data_points_signals[POINT_CHANGED] =
-        g_signal_new ("point-changed",
+    egg_data_points_signals[POINT_INSERTED] =
+        g_signal_new ("point-inserted",
+                      G_TYPE_FROM_CLASS (klass),
+                      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+                      0,
+                      NULL, NULL,
+                      g_cclosure_marshal_VOID__UINT,
+                      G_TYPE_NONE,
+                      1, G_TYPE_UINT);
+
+    egg_data_points_signals[POINT_REMOVED] =
+        g_signal_new ("point-removed",
                       G_TYPE_FROM_CLASS (klass),
                       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
                       0,

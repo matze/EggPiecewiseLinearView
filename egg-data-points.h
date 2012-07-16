@@ -64,6 +64,12 @@ guint             egg_data_points_add_point     (EggDataPoints *data_points,
                                                  gdouble        x,
                                                  gdouble        y,
                                                  gdouble        increment);
+void              egg_data_points_insert_point  (EggDataPoints *data_points,
+                                                 guint          index,
+                                                 gdouble        x,
+                                                 gdouble        y);
+void              egg_data_points_remove_point  (EggDataPoints *data_points,
+                                                 guint          index);
 guint             egg_data_points_get_num       (EggDataPoints *data_points);
 GtkAdjustment   * egg_data_points_get_x         (EggDataPoints *data_points,
                                                  guint          index);
