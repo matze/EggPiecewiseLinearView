@@ -97,6 +97,35 @@ egg_piecewise_linear_view_get_points (EggPiecewiseLinearView *view)
     return view->priv->points;
 }
 
+void
+egg_piecewise_linear_view_set_grid (EggPiecewiseLinearView *view,
+                                         gdouble                 x_increment,
+                                         gdouble                 y_increment)
+{
+    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
+
+    g_object_set (view,
+                  "x-grid", x_increment > 0.0,
+                  "y-grid", y_increment > 0.0,
+                  "x-grid-increment", x_increment,
+                  "y-grid-increment", y_increment,
+                  NULL);
+}
+void
+egg_piecewise_linear_view_set_fixed (EggPiecewiseLinearView *view,
+                                     gboolean                fixed_x_axis,
+                                     gboolean                fixed_y_axis,
+                                     gboolean                fixed_borders)
+{
+    g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
+
+    g_object_set (view,
+                  "fixed-x", fixed_x_axis,
+                  "fixed-y", fixed_y_axis,
+                  "fixed-borders", fixed_borders,
+                  NULL);
+}
+
 static void
 egg_piecewise_linear_view_size_request (GtkWidget *widget, GtkRequisition *requisition)
 {

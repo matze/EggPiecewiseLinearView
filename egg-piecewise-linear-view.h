@@ -55,7 +55,13 @@ GtkWidget     * egg_piecewise_linear_view_new           (void);
 void            egg_piecewise_linear_view_set_points    (EggPiecewiseLinearView *view,
                                                          EggDataPoints          *points);
 EggDataPoints * egg_piecewise_linear_view_get_points    (EggPiecewiseLinearView *view);
-
+void            egg_piecewise_linear_view_set_fixed     (EggPiecewiseLinearView *view,
+                                                         gboolean                fixed_x_axis,
+                                                         gboolean                fixed_y_axis,
+                                                         gboolean                fixed_borders);
+void            egg_piecewise_linear_view_set_grid      (EggPiecewiseLinearView *view,
+                                                         gdouble                 x_increment,
+                                                         gdouble                 y_increment);
 
 G_END_DECLS
 
