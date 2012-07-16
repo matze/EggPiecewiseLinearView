@@ -74,6 +74,8 @@ static GParamSpec *egg_piecewise_linear_view_properties[N_PROPERTIES] = { NULL, 
 
 static guint egg_piecewise_linear_view_signals[LAST_SIGNAL] = { 0 };
 
+static void on_point_changed (EggDataPoints *points, guint index, EggPiecewiseLinearView *view);
+
 GtkWidget *
 egg_piecewise_linear_view_new (void)
 {
@@ -87,6 +89,9 @@ egg_piecewise_linear_view_set_points (EggPiecewiseLinearView *view, EggDataPoint
 
     g_object_ref (points);
     view->priv->points = points;
+
+    g_signal_connect (points, "point-inserted", G_CALLBACK (on_point_changed), view);
+    g_signal_connect (points, "point-removed", G_CALLBACK (on_point_changed), view);
 }
 
 EggDataPoints *
@@ -146,6 +151,12 @@ map_y_to_window (gdouble *y, gdouble yscale, gdouble height)
 {
     *y /= yscale;
     *y = height - (*y) * height;
+}
+
+static void
+on_point_changed (EggDataPoints *points, guint index, EggPiecewiseLinearView *view)
+{
+    gtk_widget_queue_draw (GTK_WIDGET (view));
 }
 
 static gboolean
