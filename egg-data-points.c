@@ -45,12 +45,15 @@ enum
 {
     POINT_INSERTED,
     POINT_REMOVED,
+    VALUE_CHANGED,
     LAST_SIGNAL
 };
 
 static GParamSpec *egg_data_points_properties[N_PROPERTIES] = { NULL, };
 
 static guint egg_data_points_signals[LAST_SIGNAL] = { 0 };
+
+static void on_value_changed (GtkAdjustment *adjustment, EggDataPoints *points);
 
 
 EggDataPoints *
@@ -91,7 +94,7 @@ egg_data_points_get_y_range (EggDataPoints *points,
 }
 
 guint
-egg_data_points_add_point (EggDataPoints *data_points,
+egg_data_points_add_point (EggDataPoints *points,
                            gdouble        x,
                            gdouble        y,
                            gdouble        increment)
@@ -100,9 +103,9 @@ egg_data_points_add_point (EggDataPoints *data_points,
     GtkAdjustment *x_adj;
     GtkAdjustment *y_adj;
 
-    g_return_val_if_fail (EGG_IS_DATA_POINTS (data_points), 0);
+    g_return_val_if_fail (EGG_IS_DATA_POINTS (points), 0);
 
-    priv  = EGG_DATA_POINTS_GET_PRIVATE (data_points);
+    priv  = EGG_DATA_POINTS_GET_PRIVATE (points);
     x_adj = GTK_ADJUSTMENT (gtk_adjustment_new (x, priv->lower_x, priv->upper_x, increment, 10, 0));
     y_adj = GTK_ADJUSTMENT (gtk_adjustment_new (y, priv->lower_y, priv->upper_y, increment, 10, 0));
 
@@ -110,6 +113,9 @@ egg_data_points_add_point (EggDataPoints *data_points,
     g_object_ref_sink (y_adj);
     g_ptr_array_add (priv->x_adjustments, x_adj);
     g_ptr_array_add (priv->y_adjustments, y_adj);
+
+    g_signal_connect (x_adj, "value-changed", G_CALLBACK (on_value_changed), points);
+    g_signal_connect (y_adj, "value-changed", G_CALLBACK (on_value_changed), points);
 
     return priv->x_adjustments->len - 1;
 }
@@ -310,6 +316,20 @@ egg_data_get_closest_point (EggDataPoints *points,
 }
 
 static void
+on_value_changed (GtkAdjustment *adjustment, EggDataPoints *points)
+{
+    EggDataPointsPrivate *priv = EGG_DATA_POINTS_GET_PRIVATE (points);
+
+    for (guint i = 0; i < priv->x_adjustments->len; i++) {
+        if (g_ptr_array_index (priv->x_adjustments, i) == adjustment ||
+            g_ptr_array_index (priv->y_adjustments, i) == adjustment) {
+            g_signal_emit (points, egg_data_points_signals[VALUE_CHANGED], 0, i);
+            break;
+        }
+    }
+}
+
+static void
 egg_data_points_set_property (GObject        *object,
                               guint           property_id,
                               const GValue   *value,
@@ -457,6 +477,16 @@ egg_data_points_class_init (EggDataPointsClass *klass)
 
     egg_data_points_signals[POINT_REMOVED] =
         g_signal_new ("point-removed",
+                      G_TYPE_FROM_CLASS (klass),
+                      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+                      0,
+                      NULL, NULL,
+                      g_cclosure_marshal_VOID__UINT,
+                      G_TYPE_NONE,
+                      1, G_TYPE_UINT);
+
+    egg_data_points_signals[VALUE_CHANGED] =
+        g_signal_new ("value-changed",
                       G_TYPE_FROM_CLASS (klass),
                       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
                       0,

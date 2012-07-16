@@ -92,6 +92,7 @@ egg_piecewise_linear_view_set_points (EggPiecewiseLinearView *view, EggDataPoint
 
     g_signal_connect (points, "point-inserted", G_CALLBACK (on_point_changed), view);
     g_signal_connect (points, "point-removed", G_CALLBACK (on_point_changed), view);
+    g_signal_connect (points, "value-changed", G_CALLBACK (on_point_changed), view);
 }
 
 EggDataPoints *
@@ -104,8 +105,8 @@ egg_piecewise_linear_view_get_points (EggPiecewiseLinearView *view)
 
 void
 egg_piecewise_linear_view_set_grid (EggPiecewiseLinearView *view,
-                                         gdouble                 x_increment,
-                                         gdouble                 y_increment)
+                                    gdouble                 x_increment,
+                                    gdouble                 y_increment)
 {
     g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
 
@@ -116,6 +117,7 @@ egg_piecewise_linear_view_set_grid (EggPiecewiseLinearView *view,
                   "y-grid-increment", y_increment,
                   NULL);
 }
+
 void
 egg_piecewise_linear_view_set_fixed (EggPiecewiseLinearView *view,
                                      gboolean                fixed_x_axis,
