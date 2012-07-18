@@ -58,7 +58,9 @@ EggDataPoints * egg_piecewise_linear_view_get_points    (EggPiecewiseLinearView 
 void            egg_piecewise_linear_view_set_fixed     (EggPiecewiseLinearView *view,
                                                          gboolean                fixed_x_axis,
                                                          gboolean                fixed_y_axis,
-                                                         gboolean                fixed_borders);
+                                                         gboolean                fixed_borders,
+                                                         gboolean                restrict_x,
+                                                         gboolean                restrict_y);
 void            egg_piecewise_linear_view_set_grid      (EggPiecewiseLinearView *view,
                                                          gdouble                 x_increment,
                                                          gdouble                 y_increment);

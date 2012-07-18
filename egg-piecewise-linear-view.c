@@ -38,6 +38,8 @@ struct _EggPiecewiseLinearViewPrivate
     GtkAdjustment  *dragged_x;
     GtkAdjustment  *dragged_y;
 
+    gboolean        restrict_x;
+    gboolean        restrict_y;
     gboolean        fixed_x;
     gboolean        fixed_y;
     gboolean        fixed_borders;
@@ -61,6 +63,8 @@ enum
     PROP_FIXED_X,
     PROP_FIXED_Y,
     PROP_FIXED_BORDERS,
+    PROP_RESTRICT_X,
+    PROP_RESTRICT_Y,
     N_PROPERTIES
 };
 
@@ -122,14 +126,18 @@ void
 egg_piecewise_linear_view_set_fixed (EggPiecewiseLinearView *view,
                                      gboolean                fixed_x_axis,
                                      gboolean                fixed_y_axis,
-                                     gboolean                fixed_borders)
+                                     gboolean                fixed_borders,
+                                     gboolean                restrict_x,
+                                     gboolean                restrict_y)
 {
     g_return_if_fail (EGG_PIECEWISE_LINEAR_VIEW (view));
 
     g_object_set (view,
-                  "fixed-x", fixed_x_axis,
-                  "fixed-y", fixed_y_axis,
+                  "fixed-x-axis", fixed_x_axis,
+                  "fixed-y-axis", fixed_y_axis,
                   "fixed-borders", fixed_borders,
+                  "restrict-x", restrict_x,
+                  "restrict-y", restrict_y,
                   NULL);
 }
 
@@ -401,6 +409,7 @@ egg_piecewise_linear_motion_notify (GtkWidget *widget, GdkEventMotion *event)
     guint            n_points;
     gdouble          distance;
     guint            closest;
+    gboolean         set_x, set_y;
 
     get_closest_point (widget, event->x, event->y, &x, &y, &closest, &distance);
     n_points = egg_data_points_get_num (priv->points);
@@ -412,10 +421,41 @@ egg_piecewise_linear_motion_notify (GtkWidget *widget, GdkEventMotion *event)
         }
     }
     else {
-        if (!priv->fixed_x)
+        set_x = !priv->fixed_x;
+        set_y = !priv->fixed_y;
+
+        if (priv->restrict_x) {
+            if (priv->dragged_index > 0) {
+                gdouble lower_x;
+                lower_x = egg_data_points_get_x_value (priv->points, priv->dragged_index - 1);
+                set_x = set_x && (x >= lower_x);
+            }
+
+            if (priv->dragged_index < n_points - 1) {
+                gdouble upper_x;
+                upper_x = egg_data_points_get_x_value (priv->points, priv->dragged_index + 1);
+                set_x = set_x && (x <= upper_x);
+            }
+        }
+
+        if (priv->restrict_y) {
+            if (priv->dragged_index > 0) {
+                gdouble lower_y;
+                lower_y = egg_data_points_get_y_value (priv->points, priv->dragged_index - 1);
+                set_y = set_y && (y >= lower_y);
+            }
+
+            if (priv->dragged_index < n_points - 1) {
+                gdouble upper_y;
+                upper_y = egg_data_points_get_y_value (priv->points, priv->dragged_index + 1);
+                set_y = set_y && (y <= upper_y);
+            }
+        }
+
+        if (set_x)
             gtk_adjustment_set_value (priv->dragged_x, x);
 
-        if (!priv->fixed_y)
+        if (set_y)
             gtk_adjustment_set_value (priv->dragged_y, y);
 
         cursor_type = GDK_FLEUR;
@@ -465,6 +505,12 @@ egg_piecewise_linear_view_set_property (GObject        *object,
         case PROP_FIXED_BORDERS:
             priv->fixed_borders = g_value_get_boolean (value);
             break;
+        case PROP_RESTRICT_X:
+            priv->restrict_x = g_value_get_boolean (value);
+            break;
+        case PROP_RESTRICT_Y:
+            priv->restrict_y = g_value_get_boolean (value);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
             return;
@@ -511,6 +557,12 @@ egg_piecewise_linear_view_get_property (GObject    *object,
             break;
         case PROP_FIXED_BORDERS:
             g_value_set_boolean (value, priv->fixed_borders);
+            break;
+        case PROP_RESTRICT_X:
+            g_value_set_boolean (value, priv->restrict_x);
+            break;
+        case PROP_RESTRICT_Y:
+            g_value_set_boolean (value, priv->restrict_y);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -588,14 +640,14 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
                              G_PARAM_READWRITE);
 
     egg_piecewise_linear_view_properties[PROP_FIXED_X] =
-        g_param_spec_boolean ("fixed-x",
+        g_param_spec_boolean ("fixed-x-axis",
                               "TRUE if x values cannot be changed",
                               "TRUE if x values cannot be changed",
                               FALSE,
                               G_PARAM_READWRITE);
 
     egg_piecewise_linear_view_properties[PROP_FIXED_Y] =
-        g_param_spec_boolean ("fixed-y",
+        g_param_spec_boolean ("fixed-y-axis",
                               "TRUE if y values cannot be changed",
                               "TRUE if y values cannot be changed",
                               FALSE,
@@ -605,6 +657,20 @@ egg_piecewise_linear_view_class_init (EggPiecewiseLinearViewClass *klass)
         g_param_spec_boolean ("fixed-borders",
                               "TRUE if border values cannot be changed",
                               "TRUE if border values cannot be changed",
+                              FALSE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_RESTRICT_X] =
+        g_param_spec_boolean ("restrict-x",
+                              "TRUE if points cannot fall below/exceed their neighbors on the x-axis",
+                              "TRUE if points cannot fall below/exceed their neighbors on the x-axis",
+                              FALSE,
+                              G_PARAM_READWRITE);
+
+    egg_piecewise_linear_view_properties[PROP_RESTRICT_Y] =
+        g_param_spec_boolean ("restrict-y",
+                              "TRUE if points cannot fall below/exceed their neighbors on the y-axis",
+                              "TRUE if points cannot fall below/exceed their neighbors on the y-axis",
                               FALSE,
                               G_PARAM_READWRITE);
 
@@ -632,14 +698,16 @@ egg_piecewise_linear_view_init (EggPiecewiseLinearView *view)
 
     view->priv = priv = EGG_PIECEWISE_LINEAR_VIEW_GET_PRIVATE (view);
     priv->border_width = 2;
-    priv->points    = NULL;
-    priv->grabbed   = FALSE;
-    priv->grid_x    = TRUE;
-    priv->grid_y    = TRUE;
-    priv->snap_to_x = FALSE;
-    priv->snap_to_y = FALSE;
-    priv->fixed_x   = FALSE;
-    priv->fixed_y   = FALSE;
+    priv->points     = NULL;
+    priv->grabbed    = FALSE;
+    priv->grid_x     = TRUE;
+    priv->grid_y     = TRUE;
+    priv->snap_to_x  = FALSE;
+    priv->snap_to_y  = FALSE;
+    priv->restrict_x = TRUE;
+    priv->restrict_y = TRUE;
+    priv->fixed_x    = FALSE;
+    priv->fixed_y    = FALSE;
     priv->fixed_borders = FALSE;
     priv->grid_x_increment = 1.0;
     priv->grid_y_increment = 1.0;

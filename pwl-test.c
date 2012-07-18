@@ -65,7 +65,8 @@ main (int argc, char* argv[])
     /* Add some points */
     points = egg_data_points_new (0.0, 2.0, 0.0, 300.0);
     egg_data_points_add_point (points, 0.0, 0.0, 1.0);
-    egg_data_points_add_point (points, 1.0, 100.0, 1.0);
+    egg_data_points_add_point (points, 0.5, 100.0, 1.0);
+    egg_data_points_add_point (points, 1.5, 100.0, 1.0);
     egg_data_points_add_point (points, 2.0, 200.0, 1.0);
 
     view = egg_piecewise_linear_view_new ();
@@ -95,7 +96,7 @@ main (int argc, char* argv[])
     /* Create grid buttons */
     grid_x_enable_button = gtk_check_button_new_with_label ("Snap to X");
     grid_y_enable_button = gtk_check_button_new_with_label ("Snap to Y");
-    grid_x = GTK_ADJUSTMENT (gtk_adjustment_new (1.0, 0.1, 3.0, 0.01, 1.0, 0.0));
+    grid_x = GTK_ADJUSTMENT (gtk_adjustment_new (0.25, 0.1, 3.0, 0.01, 1.0, 0.0));
     grid_y = GTK_ADJUSTMENT (gtk_adjustment_new (10.0, 1.0, 300.0, 1.0, 10.0, 0.0));
 
     grid_x_button = gtk_spin_button_new (grid_x, 0.1, 3);
@@ -118,8 +119,8 @@ main (int argc, char* argv[])
     gtk_container_add (GTK_CONTAINER (window), container);
 
     /* Connect widgets with properties */
-    g_object_bind_property (fixed_x_button, "active", view, "fixed-x", G_BINDING_BIDIRECTIONAL);
-    g_object_bind_property (fixed_y_button, "active", view, "fixed-y", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_x_button, "active", view, "fixed-x-axis", G_BINDING_BIDIRECTIONAL);
+    g_object_bind_property (fixed_y_button, "active", view, "fixed-y-axis", G_BINDING_BIDIRECTIONAL);
     g_object_bind_property (fixed_borders_button, "active", view, "fixed-borders", G_BINDING_BIDIRECTIONAL);
 
     g_object_bind_property (grid_x_enable_button, "active", view, "snap-to-x", G_BINDING_BIDIRECTIONAL);
@@ -128,10 +129,7 @@ main (int argc, char* argv[])
     g_object_bind_property (grid_y, "value", view, "y-grid-increment", G_BINDING_BIDIRECTIONAL);
 
     /* Initialize the view with something useful */
-    g_object_set (view,
-                  "x-grid-increment", 1.0,
-                  "y-grid-increment", 50.0,
-                  NULL);
+    egg_piecewise_linear_view_set_grid (EGG_PIECEWISE_LINEAR_VIEW (view), 0.25, 50.0);
 
     gtk_widget_show_all (window);
     gtk_main ();
